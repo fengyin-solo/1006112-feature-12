@@ -32,6 +32,12 @@ export type ActionResult = {
   message: string
 }
 
+/** 测量班组提交读数时的会话上下文：操作人与当前作业面，用于权限与跨作业面校验。 */
+export type MeasureContext = {
+  operator: string
+  workface: string
+}
+
 export type OverviewResult = {
   cards: { label: string; value: number }[]
   modules: { name: string; created: number; pending: number; abnormal: number }[]

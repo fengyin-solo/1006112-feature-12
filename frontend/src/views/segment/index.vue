@@ -24,6 +24,10 @@
       </span>
     </p>
 
+    <p class="linkage-note">
+      轴线偏差联动：超限 {{ axisOverLimitCount }} 环，已纳入返工清单 {{ axisReworkCount }} 环（与轴线偏差页读的是同一份数据）。
+    </p>
+
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
         <span>{{ field }}</span>
@@ -74,6 +78,8 @@
 import { computed, onMounted, ref } from 'vue'
 
 import {
+  axisOverLimitRingNumbers,
+  axisReworkRingNumbers,
   downloadEntries,
   listEntries,
   moduleMeta,
@@ -85,13 +91,20 @@ const meta = moduleMeta('segment')
 const columns = ["管片环号", "管片型号", "拼装点位", "螺栓扭矩", "错台量", "拼装班组", "拼装日期", "拼装状态"]
 const actions = ["开始拼装", "提交验收", "登记返工"]
 const statuses = ["待拼装", "拼装中", "已验收", "已返工"]
-const stats = [{"label": "待拼装环数", "value": 0}, {"label": "已验收环数", "value": 0}, {"label": "返工环数", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+// 与轴线偏差页同源的超限/返工环数，两处只认一份。
+const axisOverLimitCount = ref(0)
+const axisReworkCount = ref(0)
+const stats = computed(() => [
+  { label: '待拼装环数', value: rows.value.filter((row) => row.status === '待拼装').length },
+  { label: '已验收环数', value: rows.value.filter((row) => row.status === '已验收').length },
+  { label: '返工环数', value: rows.value.filter((row) => row.status === '已返工').length },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -128,6 +141,8 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    axisOverLimitCount.value = axisOverLimitRingNumbers().length
+    axisReworkCount.value = axisReworkRingNumbers().length
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '管片拼装列表读取失败'
   }

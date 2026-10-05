@@ -40,12 +40,16 @@ export function listRows(key: string): EntryRow[] {
   return allRows()[key] ?? []
 }
 
-export function saveRows(key: string, rows: EntryRow[]): void {
-  const next = { ...allRows(), [key]: rows }
-  cache = next
+// 入库是原子的：先写 localStorage，写成功才换内存缓存；写失败抛错，缓存不动，本次变更一律不落。
+export function saveAll(next: Record<string, EntryRow[]>): void {
   if (typeof window !== 'undefined' && window.localStorage) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   }
+  cache = next
+}
+
+export function saveRows(key: string, rows: EntryRow[]): void {
+  saveAll({ ...allRows(), [key]: rows })
 }
 
 export function resetRows(key: string): EntryRow[] {
