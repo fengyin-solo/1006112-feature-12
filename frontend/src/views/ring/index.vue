@@ -22,6 +22,7 @@
       <span v-for="item in statusSummary" :key="item.status" class="legend-item">
         {{ item.status }}：{{ item.count }}
       </span>
+      <span class="legend-item linked">纠偏环数取自「轴线偏差」处置进度，两边只认一份</span>
     </p>
 
     <form class="filter-bar" @submit.prevent="reload">
@@ -77,6 +78,7 @@ import {
   downloadEntries,
   listEntries,
   moduleMeta,
+  ringCorrectedCount,
   runAction as applyAction,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
@@ -85,13 +87,19 @@ const meta = moduleMeta('ring')
 const columns = ["环号", "起始里程", "掘进速度", "总推力", "刀盘扭矩", "出土方量", "掘进班组", "环次状态"]
 const actions = ["开始掘进", "确认完成", "申请纠偏"]
 const statuses = ["待掘进", "掘进中", "已贯通", "已纠偏"]
-const stats = [{"label": "本月掘进环数", "value": 0}, {"label": "平均掘进速度", "value": 0}, {"label": "纠偏环数", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
+const correctedCount = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+// 纠偏环数是轴线处置进度的派生值，这里不独立统计，避免和轴线页两套数。
+const stats = computed(() => [
+  { label: "本月掘进环数", value: rows.value.length },
+  { label: "平均掘进速度", value: 0 },
+  { label: "纠偏环数（取自轴线）", value: correctedCount.value },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -128,6 +136,7 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    correctedCount.value = ringCorrectedCount()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '掘进环次列表读取失败'
   }
@@ -135,3 +144,10 @@ function reload() {
 
 onMounted(reload)
 </script>
+
+<style scoped>
+.legend-item.linked {
+  background: #e8f0fe;
+  color: #1f6feb;
+}
+</style>

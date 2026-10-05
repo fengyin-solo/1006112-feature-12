@@ -1,5 +1,14 @@
 import { MODULE_BY_KEY } from '@/data/modules'
-import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
+import {
+  AXIS_KEY,
+  axisStats,
+  correctedRingCount,
+  executeAxis,
+  overLimitCount,
+  reworkList,
+  type AxisCommand,
+} from '@/data/axis-workflow'
+import { allRows, commitRows, listRows, resetRows, saveRows } from '@/data/local-store'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
@@ -103,3 +112,37 @@ export function loadOverview(): OverviewResult {
   ]
   return { cards, modules }
 }
+
+// ── 轴线偏差：单向处置进度的专用入口，其他页面（管片返工、掘进纠偏环数）都从这里取数 ──
+
+export function listAxis(filters: Record<string, string> = {}): PageResult {
+  return listEntries(AXIS_KEY, filters)
+}
+
+/** 处置动作统一入口：状态机校验通过后才提交，入库失败一律不落。 */
+export function submitAxis(command: AxisCommand): ActionResult {
+  const rows = listRows(AXIS_KEY)
+  const { rows: next, outcome } = executeAxis(rows, command)
+  if (!outcome.ok) {
+    return { ok: false, message: outcome.message }
+  }
+  if (outcome.duplicate) {
+    return { ok: true, message: outcome.message }
+  }
+  const committed = commitRows(AXIS_KEY, next)
+  if (!committed) {
+    return { ok: false, message: '入库失败，本次处置未保留（数据未落库）' }
+  }
+  return { ok: true, message: outcome.message }
+}
+
+export const axisOverview = () => axisStats(listRows(AXIS_KEY))
+
+/** 管片拼装页的返工清单：与轴线页同一数据源，按环只一条。 */
+export const segmentReworkList = () => reworkList(listRows(AXIS_KEY))
+
+/** 两处页面的超限环数都调它，保证不是两套数。 */
+export const sharedOverLimitCount = () => overLimitCount(listRows(AXIS_KEY))
+
+/** 掘进环次页的纠偏环数：读轴线这一份，不另计。 */
+export const ringCorrectedCount = () => correctedRingCount(listRows(AXIS_KEY))
